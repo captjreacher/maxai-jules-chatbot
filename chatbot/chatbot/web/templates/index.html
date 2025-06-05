@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; }
+        .container { max-width: 600px; margin: 30px auto; background-color: #fff; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); border-radius: 8px; }
+        h1 { text-align: center; color: #333; }
+        .chat-window {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+        }
+        .message { margin-bottom: 10px; padding: 8px 12px; border-radius: 15px; }
+        .user-message { background-color: #007bff; color: white; text-align: right; margin-left: auto; max-width: 70%; border-bottom-right-radius: 0px;}
+        .bot-message { background-color: #e9ecef; color: #333; text-align: left; margin-right: auto; max-width: 70%; border-bottom-left-radius: 0px;}
+        .message p { margin: 0; }
+        form { display: flex; }
+        input[type="text"] { flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-right: 10px; }
+        input[type="submit"] { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        input[type="submit"]:hover { background-color: #0056b3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Simple Chatbot</h1>
+        <div class="chat-window" id="chat-window">
+            {% if not conversation %}
+                <p class="bot-message">Bot: Hello! How can I help you today?</p>
+            {% endif %}
+            {% for item in conversation %}
+                <div class="message user-message"><p><strong>You:</strong> {{ item.user }}</p></div>
+                <div class="message bot-message"><p><strong>Bot:</strong> {{ item.bot }}</p></div>
+            {% endfor %}
+        </div>
+        <form method="POST" action="/">
+            <input type="text" name="message" placeholder="Type your message..." autofocus autocomplete="off">
+            <input type="submit" value="Send">
+        </form>
+    </div>
+    <script>
+        // Scroll to the bottom of the chat window
+        const chatWindow = document.getElementById('chat-window');
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    </script>
+</body>
+</html>
