@@ -1,56 +1,51 @@
-# chatbot/web/app.py
 import sys
 import os
 from flask import Flask, render_template, request
 
-# Adjust sys.path to include the parent directory (chatbot)
-# This allows Flask to find the 'chatbot.core' module
-# __file__ is chatbot/web/app.py
-# os.path.dirname(__file__) is chatbot/web
-# os.path.dirname(os.path.dirname(__file__)) is chatbot (the project's chatbot directory)
-# This assumes the 'chatbot' directory itself is the root for module resolution for this project.
-# If your project root is one level higher (e.g. a directory containing the 'chatbot' dir), adjust accordingly.
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Adjust sys.path to allow importing from the parent directory (chatbot)
+# This assumes 'app.py' is in 'chatbot/chatbot/web/' and 'core' is in 'chatbot/chatbot/core/'
+# We need to go up two levels from app.py to reach the project root 'chatbot/'
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 try:
-    from chatbot.core.rules_based_chatbot import get_response, rules as loaded_rules
+    from chatbot.core.rules_based_chatbot import get_response
 except ImportError as e:
-    print(f"Error importing chatbot.core.rules_based_chatbot: {e}")
-    print("Please ensure that the 'chatbot' directory (the one containing core, web, etc.) is in your PYTHONPATH.")
-    print(f"PROJECT_ROOT determined as: {PROJECT_ROOT}")
-    print(f"sys.path: {sys.path}")
-    # Define a fallback get_response if import fails, so Flask app can still start to show errors
-    def get_response(user_input):
-        return "ERROR: Chatbot core not loaded. Please check server logs."
-    loaded_rules = {} # and empty rules
+    print(f"Error importing 'get_response': {e}")
+    print(f"Current sys.path: {sys.path}")
+    print(f"PROJECT_ROOT used for import: {PROJECT_ROOT}")
+    print(f"Current working directory: {os.getcwd()}")
+    # Define a dummy get_response if the import fails
+    def get_response(message):
+        return f"Chatbot core logic error: Could not import 'get_response'. Details: {e}"
 
-app = Flask(__name__) # Looks for templates in a 'templates' folder in the same directory as app.py
-
-# Store conversation history in a simple list (for demonstration purposes)
-# In a real app, you might use a session or a database.
+app = Flask(__name__) # Flask will look for templates in a 'templates' folder in the same dir as app.py
 conversation = []
 
 @app.route('/', methods=['GET', 'POST'])
-def home():
+def chat():
     if request.method == 'POST':
-        user_message = request.form.get('message')
-        if user_message:
-            bot_response = get_response(user_message)
-            conversation.append({'user': user_message, 'bot': bot_response})
-            # For 'bye' command, if it's a rule, we might want to clear conversation or add a special message
-            if user_message.lower() == "bye" and "bye" in loaded_rules and loaded_rules["bye"] == bot_response:
-                # Optionally, you could clear conversation or add a "Session ended" message
-                pass
-    # Pass a copy of the conversation to avoid modification issues if any
+        user_message = request.form['message']
+        bot_response = get_response(user_message)
+        conversation.append({'user': user_message, 'bot': bot_response})
+    # Ensure the template is looked for in the correct relative path
     return render_template('index.html', conversation=list(conversation))
 
 if __name__ == '__main__':
-    print(f"Attempting to run Flask app. Ensure 'chatbot.core' can be imported.")
-    print(f"PROJECT_ROOT for module resolution: {PROJECT_ROOT}")
-    print(f"Current sys.path: {sys.path}")
-    if 'chatbot.core.rules_based_chatbot' not in sys.modules:
-        print("Warning: 'chatbot.core.rules_based_chatbot' not found in sys.modules before app.run().")
-        print("If you see import errors from Flask, the path adjustment might not be correct for your environment.")
+    # This ensures Flask looks for templates in 'chatbot/chatbot/web/templates'
+    # by convention, if the app is in 'chatbot/chatbot/web/'
+    print(f"Flask app __name__ is {__name__}")
+    print(f"Flask app root_path is {app.root_path}")
+    # To ensure dummy template creation works as intended if needed:
+    templates_dir = os.path.join(app.root_path, 'templates')
+    if not os.path.exists(templates_dir):
+        os.makedirs(templates_dir)
+        print(f"Created missing templates directory: {templates_dir}")
+        dummy_index_path = os.path.join(templates_dir, 'index.html')
+        if not os.path.exists(dummy_index_path):
+            with open(dummy_index_path, 'w') as f_html:
+                f_html.write("<h1>Fallback Template</h1><p>Dummy index.html created as it was missing.</p>")
+                print(f"Created dummy index.html at {dummy_index_path}")
+
     app.run(debug=True, host='0.0.0.0', port=5000)
