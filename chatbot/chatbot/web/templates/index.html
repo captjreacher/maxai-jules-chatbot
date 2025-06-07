@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background-color: #f4f4f4; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .chat-container { width: 80%; max-width: 600px; background-color: #fff; box-shadow: 0 0 10px rgba(0,0,0,0.1); border-radius: 8px; display: flex; flex-direction: column; height: 70vh; }
+        .chat-header { background-color: #007bff; color: white; padding: 15px; text-align: center; border-top-left-radius: 8px; border-top-right-radius: 8px; }
+        .chat-box { flex-grow: 1; padding: 20px; overflow-y: auto; border-bottom: 1px solid #eee; }
+        .message { margin-bottom: 15px; display: flex; }
+        .message.user .bubble { background-color: #007bff; color: white; margin-left: auto; border-bottom-right-radius: 0px;}
+        .message.bot .bubble { background-color: #e9e9eb; color: #333; margin-right: auto; border-bottom-left-radius: 0px;}
+        .bubble { padding: 10px 15px; border-radius: 15px; max-width: 70%; word-wrap: break-word; box-shadow: 0px 1px 1px rgba(0,0,0,0.1); }
+        .bubble strong { font-weight: 600; }
+        .input-area { display: flex; padding: 15px; border-top: 1px solid #eee; background-color: #f8f9fa;}
+        .input-area input[type="text"] { flex-grow: 1; padding: 10px 15px; border: 1px solid #ccc; border-radius: 20px; margin-right: 10px; font-size: 1em;}
+        .input-area button { background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-size: 1em; }
+        .input-area button:hover { background-color: #0056b3; }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h2>MaximisedAI Chatbot</h2>
+        </div>
+        <div class="chat-box" id="chatBox">
+            {% for chat_item in conversation %}
+                {% if chat_item.user %}
+                    <div class="message user">
+                        <div class="bubble">
+                            <strong>You:</strong> {{ chat_item.user }}
+                        </div>
+                    </div>
+                {% elif chat_item.bot %}
+                     <div class="message bot">
+                        <div class="bubble">
+                            <strong>Bot:</strong> {{ chat_item.bot }}
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        <form class="input-area" method="POST" action="/">
+            <input type="text" name="message" placeholder="Type your message..." autocomplete="off" required autofocus>
+            <button type="submit">Send</button>
+        </form>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chatBox');
+        if(chatBox){ // Ensure chatBox is not null before accessing scrollHeight
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+</body>
+</html>
