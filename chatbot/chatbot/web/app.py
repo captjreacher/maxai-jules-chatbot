@@ -31,7 +31,8 @@ def chat():
         print(f"DEBUG: app.py - Calling get_response...")
         bot_response = get_response(user_message)
         print(f"DEBUG: app.py - Received bot_response: {bot_response}")
-        conversation.append({'user': user_message, 'bot': bot_response})
+        conversation.append({'sender': 'User', 'text': user_message})
+        conversation.append({'sender': 'Bot', 'text': bot_response})
     # Ensure the template is looked for in the correct relative path
     return render_template('index.html', conversation=list(conversation))
 

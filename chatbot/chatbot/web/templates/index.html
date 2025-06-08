@@ -27,19 +27,15 @@
         </div>
         <div class="chat-box" id="chatBox">
             {% for chat_item in conversation %}
-                {% if chat_item.user %}
-                    <div class="message user">
-                        <div class="bubble">
-                            <strong>You:</strong> {{ chat_item.user }}
-                        </div>
+                <div class="message {{ 'user' if chat_item.sender == 'User' else 'bot' }}">
+                    <div class="bubble">
+                        {% if chat_item.sender == 'User' %}
+                            <strong>You:</strong> {{ chat_item.text }}
+                        {% elif chat_item.sender == 'Bot' %}
+                            <strong>Bot:</strong> {{ chat_item.text }}
+                        {% endif %}
                     </div>
-                {% elif chat_item.bot %}
-                     <div class="message bot">
-                        <div class="bubble">
-                            <strong>Bot:</strong> {{ chat_item.bot }}
-                        </div>
-                    </div>
-                {% endif %}
+                </div>
             {% endfor %}
         </div>
         <form class="input-area" method="POST" action="/">
