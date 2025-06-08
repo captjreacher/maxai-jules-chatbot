@@ -16,7 +16,7 @@ else:
         print("WARNING: .env file not found at project root or CWD. API key may not be available.")
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-CHOSEN_MODEL_NAME = 'gemini-pro'  # Default model, will be checked against available list
+CHOSEN_MODEL_NAME = 'models/gemini-1.5-flash-latest'  # Default model, will be checked against available list
 model_instance = None
 
 if not GEMINI_API_KEY:
