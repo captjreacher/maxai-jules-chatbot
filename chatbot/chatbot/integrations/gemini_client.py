@@ -3,110 +3,149 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 
 # --- Configuration ---
-# Determine project root: two levels up from this file (chatbot/chatbot/integrations/gemini_client.py)
-# This script is in /app/chatbot/chatbot/integrations/gemini_client.py
-# Project root is three levels up to get to /app
-project_root_env_load = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-dotenv_path = os.path.join(project_root_env_load, '.env')
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..')) # Adjusted for chatbot/chatbot/integrations
+dotenv_path = os.path.join(project_root, '.env')
 
-
-# Load .env file
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path=dotenv_path)
     print(f"INFO: .env file loaded from {dotenv_path}")
 else:
-    # Fallback for environments where .env might be in CWD (e.g. running app.py from project root)
-    if load_dotenv(): # python-dotenv's load_dotenv() returns True if .env was found and loaded
-        print("INFO: .env file loaded from current working directory or parent.")
+    if load_dotenv(): # Try loading from CWD as a fallback
+        print("INFO: .env file loaded from current working directory or via dotenv default search.")
     else:
-        print("WARNING: .env file not found at project root or CWD. API key may not be available from .env.")
+        print("WARNING: .env file not found at project root or CWD. API key may not be available.")
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-model = None  # Initialize model to None globally for this module
+CHOSEN_MODEL_NAME = 'gemini-pro'  # Default model, will be checked against available list
+model_instance = None
 
 if not GEMINI_API_KEY:
-    print("CRITICAL: GEMINI_API_KEY not found in environment. Gemini features will be disabled. Ensure .env file is in project root (e.g. /app/.env) and correctly formatted, or key is set in environment.")
+    print("CRITICAL: GEMINI_API_KEY not found in environment. Gemini features will be disabled.")
 else:
-    # Mask parts of the API key for logging, showing only first and last 4 chars if long enough
-    masked_key = GEMINI_API_KEY[:4] + "****" + GEMINI_API_KEY[-4:] if len(GEMINI_API_KEY) > 8 else "key_masked (too_short_to_partially_display)"
+    masked_key = GEMINI_API_KEY[:4] + "****" + GEMINI_API_KEY[-4:] if len(GEMINI_API_KEY) > 8 else "key_masked"
     print(f"INFO: Found GEMINI_API_KEY (masked): {masked_key}")
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        # Attempt to create a model instance to verify configuration
-        model = genai.GenerativeModel('gemini-pro') # Using 'gemini-pro' as a default
-        print("INFO: Google Generative AI client configured and model instance for 'gemini-pro' created successfully.")
+        # Try to initialize with the CHOSEN_MODEL_NAME. This might fail if the model is not available.
+        model_instance = genai.GenerativeModel(CHOSEN_MODEL_NAME)
+        print(f"INFO: Google Generative AI client configured. Default model to attempt for 'get_gemini_response': '{CHOSEN_MODEL_NAME}'.")
     except Exception as e:
-        print(f"ERROR: Failed to configure Google Generative AI client or create model instance: {e}")
-        print("       This could be due to an invalid API key, incorrect project setup in Google Cloud, or network issues.")
-        model = None # Ensure model is None if configuration fails
+        print(f"WARNING: Failed to initialize default model '{CHOSEN_MODEL_NAME}' at startup: {e}")
+        print("         This might be normal if the model name needs to be changed. Model listing will proceed.")
+        model_instance = None # Ensure it's None if startup initialization fails
 
-# --- Main Function ---
-def get_gemini_response(user_input: str) -> str:
-    if not model:
-        return "Gemini client is not configured. Please check the API key and application startup logs for errors."
-
-    # This check is somewhat redundant if 'model' is None, but good for clarity
+# --- Utility Function to List Models ---
+def list_available_models_for_api_key():
+    """Lists models available to the configured API key that support 'generateContent'."""
     if not GEMINI_API_KEY:
-         return "Gemini API key is not available. Please ensure it is set in the .env file."
+        print("ERROR (list_models): Cannot list models - GEMINI_API_KEY is not set.")
+        return []
+
+    # Check if genai.configure has been called successfully.
+    # genai._is_configured is not public; rely on successful execution of genai.configure() at startup.
+    # If API key is present but genai.configure failed, model_instance would be None.
+    # If genai.configure was never called (e.g. API key missing), this function shouldn't be reached or will fail.
+
+    print("\n--- Listing Available Generative Models (supporting 'generateContent') ---")
+    valid_models_for_content = []
+    try:
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                model_info = {
+                    "name": m.name,
+                    "display_name": m.display_name,
+                    "version": m.version,
+                    "supported_generation_methods": m.supported_generation_methods
+                }
+                valid_models_for_content.append(model_info)
+                print(f"  Model: {m.name} (Version: {m.version}, Supports: {', '.join(m.supported_generation_methods)})")
+        if not valid_models_for_content:
+            print("  No models found that support 'generateContent' for your API key.")
+        else:
+            print(f"  Found {len(valid_models_for_content)} model(s) supporting 'generateContent'.")
+    except Exception as e:
+        print(f"ERROR (list_models): Could not retrieve models from API: {e}")
+    print("--- End of Model List ---")
+    return valid_models_for_content
+
+# --- Main Function to Get Gemini Response ---
+def get_gemini_response(user_input: str) -> str:
+    global model_instance # Allow modification of the global instance if re-initialization is attempted
+    if not model_instance:
+        if GEMINI_API_KEY and CHOSEN_MODEL_NAME:
+            print(f"WARNING (get_gemini_response): Model instance for '{CHOSEN_MODEL_NAME}' was not initialized at startup. Retrying now.")
+            try:
+                model_instance = genai.GenerativeModel(CHOSEN_MODEL_NAME) # Attempt to re-initialize
+                print(f"INFO (get_gemini_response): Successfully re-initialized model '{CHOSEN_MODEL_NAME}'.")
+            except Exception as e:
+                print(f"ERROR (get_gemini_response): Failed to re-initialize model '{CHOSEN_MODEL_NAME}': {e}")
+                return f"Gemini client error: Model '{CHOSEN_MODEL_NAME}' could not be initialized. Check logs."
+        else:
+            # This case means either API key is missing, or CHOSEN_MODEL_NAME is somehow not set (though it has a default)
+            return "Gemini client error: API key missing or no model name specified; model not initialized."
 
     try:
-        # Configure safety settings for content generation
-        safety_settings = [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-        ]
-
-        # Generate content
-        response = model.generate_content(user_input, safety_settings=safety_settings)
-
-        # Process response
-        if response.parts: # Check if there are parts to process
-            # Iterate through parts and concatenate their text attribute
-            # This handles cases where response.text might not be directly available or might miss some content
+        safety_settings = [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"}] # Example
+        response = model_instance.generate_content(user_input, safety_settings=safety_settings)
+        if response.parts:
             return "".join(part.text for part in response.parts if hasattr(part, 'text'))
         elif hasattr(response, 'prompt_feedback') and response.prompt_feedback.block_reason:
-            # If the content was blocked, provide the reason
-            return f"Response blocked by Gemini due to: {response.prompt_feedback.block_reason}."
+            return f"Response blocked by Gemini: {response.prompt_feedback.block_reason}."
         else:
-            # Handle cases where the response might be empty without explicit blocking
-            # Log the raw response for debugging if possible (be careful with sensitive data)
-            # print(f"DEBUG: Unexpected Gemini response structure: {response}")
-            return "Gemini returned an empty or unexpected response. This might be due to content filters or an internal issue."
-
+            return "Gemini returned an empty or unexpected response."
     except Exception as e:
-        error_message_str = str(e).lower() # Convert to string and lower for consistent matching
-        print(f"ERROR: Exception during Gemini API call: {e}") # Log the full error for server admin
+        error_message = str(e).lower()
+        # Use model_instance.model_name if available, otherwise fallback to CHOSEN_MODEL_NAME for error reporting
+        model_name_in_error = model_instance.model_name if model_instance and hasattr(model_instance, 'model_name') else CHOSEN_MODEL_NAME
+        print(f"ERROR (get_gemini_response): API call failed for model '{model_name_in_error}': {error_message}")
+        if "api key not valid" in error_message or ("permission_denied" in error_message and "api key" in error_message):
+            return "Gemini API Error: API key invalid or permission issues. Check Google Cloud Console."
+        elif "models/" in error_message and ("not found" in error_message or "is not supported" in error_message): # More specific model error
+            return f"Gemini API Error: Model '{model_name_in_error}' not found or not supported for 'generateContent'. (Details: {e})"
+        elif "quota" in error_message:
+            return "Gemini API Error: Project quota exceeded."
+        return f"Unexpected error with Gemini service using model '{model_name_in_error}': {e}"
 
-        # Provide more user-friendly messages for common errors
-        if "api key not valid" in error_message_str or \
-           ("permission_denied" in error_message_str and "api key" in error_message_str) or \
-           ("invalid_argument" in error_message_str and "api key" in error_message_str):
-            return "Gemini API Error: The API key is reported as invalid or encountering permission issues. Please double-check the key and its setup in your Google Cloud Console."
-        elif "resource_exhausted" in error_message_str or "quota" in error_message_str:
-            return "Gemini API Error: The project's quota for the Gemini API has been exceeded. Please check Google Cloud project quotas."
-        elif "deadline_exceeded" in error_message_str or "service_unavailable" in error_message_str:
-            return "Gemini API Error: The service is temporarily unavailable or the request timed out. Please try again later."
-        # General fallback error message
-        return "An unexpected error occurred while trying to contact the Gemini AI service. Please check server logs for details."
-
-# --- Direct Test Block ---
+# --- Direct Test / Model Lister Block (Corrected Order) ---
 if __name__ == '__main__':
-    print("\n--- Gemini Client Direct Test ---")
+    print("\n--- Gemini Client Direct Execution: Model Lister & Test ---")
     if not GEMINI_API_KEY:
-        print("Test Status: SKIPPED - GEMINI_API_KEY is not set in the environment.")
-    elif not model:
-        print("Test Status: SKIPPED - Gemini model could not be initialized (see logs above for errors).")
+        print("Run Status: FAILED - GEMINI_API_KEY is not set in environment.")
     else:
-        print("Test Status: ATTEMPTING - Sending test messages to Gemini...")
-        test_queries = {
-            "General Greeting": "Hello, who are you?",
-            "Simple Fact": "What is the capital of France?",
-            "Potentially Blocked (for testing safety filters)": "How do I make a Molotov cocktail?"
-        }
-        for description, query in test_queries.items():
-            print(f"  Query ({description}): \"{query}\"") # Corrected quote placement
-            response_text = get_gemini_response(query)
-            print(f"  Gemini's Response: \"{response_text}\"\n") # Corrected quote placement and added newline
-    print("--- End of Gemini Client Direct Test ---")
+        # STEP 1: List available models for the API key
+        print("\nSTEP 1: Listing available models for your API key...")
+        available_models = list_available_models_for_api_key()
+
+        # STEP 2: Provide information based on the listed models and CHOSEN_MODEL_NAME
+        print(f"\nSTEP 2: Checking configured model ('{CHOSEN_MODEL_NAME}') against available models...")
+        if not available_models:
+            print("  INFO: No models supporting 'generateContent' were found. Cannot test 'generateContent'.")
+            print("        Please check your Google Cloud project permissions for the Generative Language API.")
+        else:
+            is_chosen_model_available = any(m['name'] == CHOSEN_MODEL_NAME for m in available_models)
+            if is_chosen_model_available:
+                print(f"  INFO: The CHOSEN_MODEL_NAME ('{CHOSEN_MODEL_NAME}') is in your list of available models.")
+                if not model_instance: # If instance wasn't created at startup even if model name is valid
+                    print(f"  WARNING: However, the instance for '{CHOSEN_MODEL_NAME}' was not successfully created at startup (check earlier logs). 'get_gemini_response' will attempt to re-initialize it.")
+            else:
+                print(f"  WARNING: The CHOSEN_MODEL_NAME ('{CHOSEN_MODEL_NAME}') does NOT appear in your list of available models supporting 'generateContent'.")
+                print("           You MUST update CHOSEN_MODEL_NAME in the script to one of the listed models for 'get_gemini_response' to work.")
+                print(f"           Available model names (supporting generateContent): {[m['name'] for m in available_models]}")
+
+            # STEP 3: Conditionally test generateContent
+            # Test if CHOSEN_MODEL_NAME is available, rely on get_gemini_response to initialize if needed.
+            if is_chosen_model_available:
+                print(f"\nSTEP 3: Testing 'generateContent' with CHOSEN_MODEL_NAME: {CHOSEN_MODEL_NAME} ---")
+                test_queries = {"Greeting": "Hello, who are you?", "Fact": "What's the capital of France?"}
+                for desc, query in test_queries.items():
+                    print(f"  Query ({desc}): \"{query}\"")
+                    response = get_gemini_response(query) # This will use CHOSEN_MODEL_NAME
+                    print(f"  Response: \"{response}\"\n")
+            elif model_instance : # model_instance exists but CHOSEN_MODEL_NAME is not in available_models (edge case)
+                 print(f"\nSTEP 3: Test with CHOSEN_MODEL_NAME ('{CHOSEN_MODEL_NAME}') SKIPPED because it's not in your list of available models, though an instance for it was somehow created.")
+            else: # No instance AND chosen model is not available
+                 print(f"\nSTEP 3: Test with CHOSEN_MODEL_NAME ('{CHOSEN_MODEL_NAME}') SKIPPED. It's not in your available models list or its instance could not be created.")
+                 if not is_chosen_model_available and available_models: # Guide user if other models are available
+                     print("          Please update CHOSEN_MODEL_NAME in the script to one of the models listed in STEP 2 and retry.")
+
+    print("--- End of Direct Execution ---")
