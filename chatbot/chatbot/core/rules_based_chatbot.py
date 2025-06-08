@@ -63,6 +63,7 @@ def get_response(user_input: str) -> str:
         # .items() is already used correctly if rules is a dict
         if pattern in user_input_lower: # pattern is already lowercased during loading
             return response
+    print(f"DEBUG: rules_based_chatbot.py - No rule matched for '{user_input}'. Calling Gemini...")
     return get_gemini_response(user_input)
 
 if __name__ == '__main__':
