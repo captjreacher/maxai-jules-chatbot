@@ -4,7 +4,7 @@ from flask import Flask, render_template, request
 # Blueprint import should be after Flask, and before it's used.
 # Assuming admin_views.py is in the same directory (chatbot/web) as app.py for this import style.
 # The PROJECT_ROOT path adjustment should make 'chatbot.web' findable.
-from .admin_views import admin_bp
+from chatbot.chatbot.web.admin_views import admin_bp
 
 
 # Adjust sys.path to allow importing from the parent directory (chatbot)
