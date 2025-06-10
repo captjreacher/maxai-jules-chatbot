@@ -1,153 +1,267 @@
 import csv
 import os
-# Ensure this path is correct if gemini_client is used as a fallback
-# Assuming gemini_client.py is in chatbot/chatbot/integrations/
-# And this file is in chatbot/chatbot/core/
-# So, from core, integrations is a sibling of core, under the parent 'chatbot' (the second one)
-# The project root for app.py is one level above the parent 'chatbot'
-# This pathing can be tricky.
+from flask import session # For session management
 
-# When run via `python -m chatbot.chatbot.web.app` from project_root:
-# project_root/chatbot/chatbot/web/app.py
-# project_root/chatbot/chatbot/core/rules_based_chatbot.py
-# project_root/chatbot/chatbot/integrations/gemini_client.py
-# So the import should be from chatbot.chatbot.integrations.gemini_client
+# Assuming gemini_client.py is in chatbot/chatbot/integrations/
 from chatbot.chatbot.integrations.gemini_client import get_gemini_response
 
-# Determine Project Root (common way for data file access)
-# This file is in chatbot/chatbot/core/rules_based_chatbot.py
-# Project root is three levels up. (/app)
+# Determine Project Root for data file access
 PROJECT_ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 RULES_CSV_FILE_PATH = os.path.join(PROJECT_ROOT_DIR, 'chatbot', 'chatbot', 'data', 'rules.csv')
 
+EXPECTED_CSV_HEADERS = ['Rule_ID', 'Context_Required', 'Pattern', 'Response', 'Set_Context_On_Response', 'GoTo_Rule_ID']
+
 class RulesBasedChatbot:
     def __init__(self):
-        self.rules = {} # Initialize rules as empty dict before loading
-        self._load_rules_from_csv() # Call load_rules to populate self.rules
-        if not self.rules:
+        self.rules_list = []  # Stores rules as a list of dicts, preserving order
+        self.rules_by_id = {} # Stores rules by Rule_ID for quick GoTo lookups
+        self._load_rules_from_csv()
+        if not self.rules_list:
             print("WARNING (RulesBasedChatbot): No rules were loaded. Chatbot will rely on Gemini.")
         else:
-            print(f"INFO (RulesBasedChatbot): Loaded {len(self.rules)} rules.")
-            # print(f"DEBUG (RulesBasedChatbot): Loaded rules keys: {list(self.rules.keys())}") # Potentially very verbose
+            print(f"INFO (RulesBasedChatbot): Loaded {len(self.rules_list)} rules.")
+
+    def _ensure_csv_headers(self):
+        # Ensure parent directory exists
+        os.makedirs(os.path.dirname(RULES_CSV_FILE_PATH), exist_ok=True)
+        if not os.path.exists(RULES_CSV_FILE_PATH) or os.path.getsize(RULES_CSV_FILE_PATH) == 0:
+            print(f"DEBUG (RulesBasedChatbot): {RULES_CSV_FILE_PATH} not found or empty. Creating with headers.")
+            with open(RULES_CSV_FILE_PATH, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(EXPECTED_CSV_HEADERS)
+            return True # File was created/headers written
+        else:
+            try:
+                with open(RULES_CSV_FILE_PATH, 'r', newline='', encoding='utf-8') as f:
+                    reader = csv.reader(f)
+                    headers = next(reader, None)
+                    # Normalize headers for comparison (lower, strip)
+                    normalized_headers = [h.strip().lower() for h in headers] if headers else []
+                    normalized_expected_headers = [eh.strip().lower() for eh in EXPECTED_CSV_HEADERS]
+                    if not headers or normalized_headers != normalized_expected_headers:
+                        print(f"WARNING (RulesBasedChatbot): CSV file {RULES_CSV_FILE_PATH} has incorrect or missing headers. Expected: {EXPECTED_CSV_HEADERS}, Found: {headers}")
+                        return False # Headers are not as expected
+                    return True # Headers are fine
+            except Exception as e:
+                print(f"ERROR (RulesBasedChatbot): Could not verify CSV headers: {e}")
+                return False
 
     def _load_rules_from_csv(self):
-        # self.rules is used directly here, not a local 'rules' variable that shadows it.
+        self.rules_list = []
+        self.rules_by_id = {}
         print(f"DEBUG (RulesBasedChatbot): Attempting to load rules from: {RULES_CSV_FILE_PATH}")
-        try:
-            # Ensure rules.csv exists with headers, otherwise create it
-            if not os.path.exists(RULES_CSV_FILE_PATH):
-                print(f"DEBUG (RulesBasedChatbot): {RULES_CSV_FILE_PATH} not found. Creating with headers.")
-                os.makedirs(os.path.dirname(RULES_CSV_FILE_PATH), exist_ok=True)
-                with open(RULES_CSV_FILE_PATH, 'w', newline='', encoding='utf-8') as f:
-                    writer = csv.writer(f)
-                    writer.writerow(['pattern', 'response'])
-                # self.rules remains empty as file was just created
-                return
 
+        if not self._ensure_csv_headers():
+            print("ERROR (RulesBasedChatbot): CSV header check failed. Rules not loaded.")
+            return
+
+        try:
             with open(RULES_CSV_FILE_PATH, 'r', newline='', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
-                # Validate headers
-                if not reader.fieldnames or 'pattern' not in reader.fieldnames or 'response' not in reader.fieldnames:
-                    print(f"ERROR (RulesBasedChatbot): CSV file {RULES_CSV_FILE_PATH} is missing 'pattern' or 'response' headers. Fieldnames found: {reader.fieldnames}")
-                    # self.rules remains empty or as previously loaded if any error
-                    return
+                current_fieldnames = reader.fieldnames if reader.fieldnames else []
+                normalized_fieldnames = [fn.strip().lower() for fn in current_fieldnames]
+                normalized_expected_headers = [eh.strip().lower() for eh in EXPECTED_CSV_HEADERS]
 
-                temp_rules = {} # Load into a temporary dict first
-                print("DEBUG (RulesBasedChatbot): Loading patterns from CSV...")
+                if not current_fieldnames and os.path.getsize(RULES_CSV_FILE_PATH) > 0 :
+                     print(f"ERROR (RulesBasedChatbot): CSV file {RULES_CSV_FILE_PATH} seems to be missing headers for DictReader. Fieldnames found: {current_fieldnames}")
+                     return
+                elif current_fieldnames and normalized_fieldnames != normalized_expected_headers:
+                     print(f"ERROR (RulesBasedChatbot): CSV file {RULES_CSV_FILE_PATH} headers for DictReader do not match. Expected: {EXPECTED_CSV_HEADERS}, Found: {current_fieldnames}")
+                     return
+
+                print("DEBUG (RulesBasedChatbot): Loading rules from CSV with new structure...")
                 for i, row in enumerate(reader):
-                    pattern = row.get('pattern')
-                    response = row.get('response')
-                    if pattern and response is not None: # response can be an empty string
-                        processed_pattern = pattern.lower().strip()
-                        if not processed_pattern: # Skip if pattern is empty after processing
-                            print(f"WARNING (RulesBasedChatbot): Skipped row #{i+1} in CSV due to empty pattern after processing.")
-                            continue
-                        temp_rules[processed_pattern] = response.strip() # Store with stripped response too
-                        # print(f"DEBUG (RulesBasedChatbot): Loaded rule #{i+1}: PATTERN='{processed_pattern}' => RESPONSE='{response[:50]}...' (stripped)") # Verbose
-                    else:
-                        print(f"WARNING (RulesBasedChatbot): Skipped row #{i+1} in CSV due to missing pattern or response field.")
-                self.rules = temp_rules # Assign to instance variable after successful load
-            print(f"DEBUG (RulesBasedChatbot): Finished loading {len(self.rules)} rules from CSV.")
-        except FileNotFoundError: # Should be caught by os.path.exists, but as a safeguard
-            print(f"ERROR (RulesBasedChatbot): Rules file not found at {RULES_CSV_FILE_PATH} during read. No rules loaded.")
+                    try:
+                        rule = {}
+                        rule['Rule_ID'] = row.get('Rule_ID', '').strip()
+                        rule['Context_Required'] = row.get('Context_Required', '').strip().lower() or None
+                        rule['Pattern'] = row.get('Pattern', '').strip().lower()
+                        rule['Response'] = row.get('Response', '').strip()
+                        rule['Set_Context_On_Response'] = row.get('Set_Context_On_Response', '').strip().lower() or None
+                        rule['GoTo_Rule_ID'] = row.get('GoTo_Rule_ID', '').strip() or None
+
+                        if not rule['Rule_ID'] or not rule['Pattern']:
+                            if not rule['Rule_ID']:
+                                print(f"WARNING (RulesBasedChatbot): Skipped row #{i+1} in CSV due to missing Rule_ID.")
+                                continue
+                            if not rule['Pattern'] and not rule['Context_Required']:
+                                print(f"WARNING (RulesBasedChatbot): Skipped row #{i+1} (Rule ID: {rule['Rule_ID']}) due to missing Pattern when no Context_Required is set.")
+                                continue
+
+                        self.rules_list.append(rule)
+                        self.rules_by_id[rule['Rule_ID']] = rule
+                    except Exception as e_row:
+                        print(f"ERROR (RulesBasedChatbot): Failed to process row #{i+1}: {row}. Error: {e_row}")
+            print(f"DEBUG (RulesBasedChatbot): Finished loading {len(self.rules_list)} rules into rules_list and {len(self.rules_by_id)} into rules_by_id.")
+        except FileNotFoundError:
+            print(f"ERROR (RulesBasedChatbot): Rules file not found at {RULES_CSV_FILE_PATH}. Should have been created by _ensure_csv_headers.")
         except Exception as e:
             print(f"ERROR (RulesBasedChatbot): Could not load rules from CSV: {e}")
-        # Ensure self.rules is a dict even if loading fails badly
-        if not isinstance(self.rules, dict):
-            self.rules = {}
 
+    def _find_matching_rule(self, current_input, current_context):
+        print(f"DEBUG (RulesBasedChatbot): _find_matching_rule: input='{current_input}', context='{current_context}'")
+        for rule in self.rules_list:
+            pattern_match = rule['Pattern'] == '*' or (rule['Pattern'] and rule['Pattern'] in current_input)
+            context_match = rule['Context_Required'] == current_context
+            if context_match and pattern_match:
+                print(f"DEBUG (RulesBasedChatbot): Contextual match found: Rule ID '{rule['Rule_ID']}'")
+                return rule
 
-    def get_response(self, user_input: str) -> str:
+        for rule in self.rules_list:
+            pattern_match = rule['Pattern'] == '*' or (rule['Pattern'] and rule['Pattern'] in current_input)
+            if not rule['Context_Required'] and pattern_match:
+                print(f"DEBUG (RulesBasedChatbot): General match found: Rule ID '{rule['Rule_ID']}'")
+                return rule
+        return None
+
+    def get_response(self, user_input: str, current_session) -> str:
         processed_input = user_input.lower().strip()
-        print(f"DEBUG (RulesBasedChatbot): Received user_input='{user_input}', processed_input='{processed_input}'")
-        # print(f"DEBUG (RulesBasedChatbot): Checking against {len(self.rules)} loaded rule patterns.") # Less useful than specific checks
+        current_context = current_session.get('chatbot_context')
 
-        # Exact match first (more specific)
-        if processed_input in self.rules:
-            response = self.rules[processed_input]
-            print(f"DEBUG (RulesBasedChatbot): Exact match found for pattern='{processed_input}'. Response='{response[:70]}...'")
-            return response
+        print(f"DEBUG (RulesBasedChatbot): get_response - User Input='{user_input}', Processed='{processed_input}', Context='{current_context}'")
 
-        # Substring match (less specific)
-        for pattern_key, response_val in self.rules.items():
-            # pattern_key is already lowercased and stripped
-            # print(f"DEBUG (RulesBasedChatbot): Checking substring: IS '{pattern_key}' IN '{processed_input}'?" ) # Very verbose
-            if pattern_key in processed_input:
-                print(f"DEBUG (RulesBasedChatbot): Substring match found for pattern='{pattern_key}' in input='{processed_input}'. Response='{response_val[:70]}...'")
-                return response_val
+        final_response_parts = []
+        next_rule_id_to_process = None
+        max_goto_loops = 5
+        loops = 0
+        visited_rules_in_chain = set()
 
-        print(f"INFO (RulesBasedChatbot): No rule matched for '{processed_input}'. Calling Gemini...")
-        # Fallback to Gemini if no rule matches
-        return get_gemini_response(user_input) # Pass original user_input to Gemini
+        matched_rule = self._find_matching_rule(processed_input, current_context)
 
+        if matched_rule:
+            print(f"DEBUG (RulesBasedChatbot): Initial match: Rule ID '{matched_rule['Rule_ID']}' with response '{matched_rule['Response'][:50]}...' ")
+            if matched_rule['Response']:
+                 final_response_parts.append(matched_rule['Response'])
 
+            visited_rules_in_chain.add(matched_rule['Rule_ID'])
+
+            if matched_rule.get('Set_Context_On_Response') == 'clear' or matched_rule.get('Set_Context_On_Response') == '':
+                if current_session.get('chatbot_context') is not None:
+                    print(f"DEBUG (RulesBasedChatbot): Context CLEARED by Rule ID '{matched_rule['Rule_ID']}'.")
+                current_session.pop('chatbot_context', None)
+            elif matched_rule.get('Set_Context_On_Response'):
+                if current_session.get('chatbot_context') != matched_rule['Set_Context_On_Response']:
+                    print(f"DEBUG (RulesBasedChatbot): Context SET to '{matched_rule['Set_Context_On_Response']}' by Rule ID '{matched_rule['Rule_ID']}'.")
+                current_session['chatbot_context'] = matched_rule['Set_Context_On_Response']
+
+            next_rule_id_to_process = matched_rule.get('GoTo_Rule_ID')
+        else:
+            print(f"INFO (RulesBasedChatbot): No initial rule matched for '{processed_input}' with context '{current_context}'. Fallback to Gemini.")
+            if current_session.get('chatbot_context') is not None:
+                 print(f"DEBUG (RulesBasedChatbot): Clearing context before Gemini call.")
+            current_session.pop('chatbot_context', None)
+            return get_gemini_response(user_input)
+
+        while next_rule_id_to_process and loops < max_goto_loops:
+            loops += 1
+            if next_rule_id_to_process in visited_rules_in_chain:
+                print(f"WARNING (RulesBasedChatbot): Detected loop in GoTo chain involving Rule ID '{next_rule_id_to_process}'. Ending chain.")
+                break
+            visited_rules_in_chain.add(next_rule_id_to_process)
+
+            print(f"DEBUG (RulesBasedChatbot): Processing GoTo_Rule_ID: '{next_rule_id_to_process}', Loop: {loops}")
+            goto_rule = self.rules_by_id.get(next_rule_id_to_process)
+            if goto_rule:
+                if goto_rule['Response']:
+                    final_response_parts.append(goto_rule['Response'])
+                print(f"DEBUG (RulesBasedChatbot): GoTo Rule ID '{goto_rule['Rule_ID']}' adding response: '{goto_rule['Response'][:50]}...' ")
+
+                if goto_rule.get('Set_Context_On_Response') == 'clear' or goto_rule.get('Set_Context_On_Response') == '':
+                    if current_session.get('chatbot_context') is not None:
+                         print(f"DEBUG (RulesBasedChatbot): Context CLEARED by GoTo Rule ID '{goto_rule['Rule_ID']}'.")
+                    current_session.pop('chatbot_context', None)
+                elif goto_rule.get('Set_Context_On_Response'):
+                    if current_session.get('chatbot_context') != goto_rule['Set_Context_On_Response']:
+                        print(f"DEBUG (RulesBasedChatbot): Context SET to '{goto_rule['Set_Context_On_Response']}' by GoTo Rule ID '{goto_rule['Rule_ID']}'.")
+                    current_session['chatbot_context'] = goto_rule['Set_Context_On_Response']
+
+                next_rule_id_to_process = goto_rule.get('GoTo_Rule_ID')
+                if not next_rule_id_to_process:
+                    print(f"DEBUG (RulesBasedChatbot): GoTo chain ended at Rule ID '{goto_rule['Rule_ID']}'.")
+                    break
+            else:
+                print(f"WARNING (RulesBasedChatbot): GoTo_Rule_ID '{next_rule_id_to_process}' not found. Ending GoTo chain.")
+                break
+
+        if loops >= max_goto_loops:
+            print(f"WARNING (RulesBasedChatbot): Exceeded max GoTo loops ({max_goto_loops}). Ending chain.")
+
+        if not final_response_parts:
+            print(f"INFO (RulesBasedChatbot): Rule chain resulted in no response. Fallback to Gemini for input '{user_input}'.")
+            if current_session.get('chatbot_context') is not None:
+                 print(f"DEBUG (RulesBasedChatbot): Clearing context before Gemini call due to empty chain response.")
+            current_session.pop('chatbot_context', None)
+            return get_gemini_response(user_input)
+
+        return "\\n".join(final_response_parts) # Join chained responses with literal newlines for HTML display
+
+# --- Singleton Instance Management ---
 _chatbot_instance = None
 
 def get_chatbot_instance():
     global _chatbot_instance
     if _chatbot_instance is None:
-        print("INFO (RulesBasedChatbot Module): Creating new RulesBasedChatbot instance.")
+        print("INFO (RulesBasedChatbot Module): Creating new RulesBasedChatbot singleton instance.")
         _chatbot_instance = RulesBasedChatbot()
-    # TODO: Add logic here for re-loading rules if rules.csv has changed since last load.
-    # For now, it loads rules once per instance creation.
     return _chatbot_instance
 
-# This is the function app.py will call
-def get_response(user_input: str) -> str:
-    chatbot = get_chatbot_instance() # Ensures a single instance is used
-    return chatbot.get_response(user_input) # Call method on the instance
+# This is the main function imported and used by app.py
+def get_response_for_web(user_input: str) -> str:
+    chatbot = get_chatbot_instance()
+    # 'session' is Flask's session proxy, available in request context.
+    return chatbot.get_response(user_input, session)
 
-# Example of direct execution (for testing this module itself)
+# --- Direct Test Block (for module-level testing) ---
 if __name__ == '__main__':
-    print("--- Direct execution of rules_based_chatbot.py ---")
-    # Ensure rules.csv has some sample data for this test to be meaningful
-    # e.g., pattern "hello", response "Hi there from rules.csv!"
-    #       pattern "test rule", response "This is a test response from CSV."
+    print("--- Direct Test of RulesBasedChatbot (New Threaded Logic) ---")
 
-    # Create a dummy rules.csv for testing if it doesn't exist or is empty
-    if not os.path.exists(RULES_CSV_FILE_PATH) or os.path.getsize(RULES_CSV_FILE_PATH) < 20: # arbitrary small size
-        print(f"INFO (__main__): Creating/Overwriting {RULES_CSV_FILE_PATH} with sample rules for testing.")
-        os.makedirs(os.path.dirname(RULES_CSV_FILE_PATH), exist_ok=True)
-        with open(RULES_CSV_FILE_PATH, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow(['pattern', 'response'])
-            writer.writerow(['hello', 'Hi there from rules.csv!'])
-            writer.writerow(['test rule', 'This is a test response from CSV.'])
-            writer.writerow(['tell me a joke', 'Why did the chicken cross the road? To get to the other side! (from CSV)'])
+    # Create a dummy rules.csv for testing
+    print(f"INFO (__main__): Creating/Overwriting dummy {RULES_CSV_FILE_PATH} for testing.")
+    os.makedirs(os.path.dirname(RULES_CSV_FILE_PATH), exist_ok=True)
+    with open(RULES_CSV_FILE_PATH, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(EXPECTED_CSV_HEADERS)
+        # Rule_ID, Context_Required, Pattern, Response, Set_Context_On_Response, GoTo_Rule_ID
+        writer.writerow(['1', '', 'hello', 'Hi there! How can I help you today?', 'greeted', ''])
+        writer.writerow(['2', 'greeted', 'tell me a joke', 'Why did the scarecrow win an award?', '', 'JOKE_PUNCHLINE'])
+        writer.writerow(['JOKE_PUNCHLINE', '', '', 'Because he was outstanding in his field!', 'joke_told', '']) # Chained rule, no pattern needed if directly GoTo'd
+        writer.writerow(['3', 'greeted', 'what is your name', 'My name is Max, your virtual assistant.', '', ''])
+        writer.writerow(['4', '', 'bye', 'Goodbye! Have a great day.', 'clear', '']) # 'clear' context
+        writer.writerow(['5', '', 'chain_test_start', 'This is the first part of a chain.', 'chain_active', 'CHAIN_MIDDLE'])
+        writer.writerow(['CHAIN_MIDDLE', 'chain_active', '', 'This is the middle part, context was required.', 'chain_middle_done', 'CHAIN_END']) # Pattern can be empty if context is key
+        writer.writerow(['CHAIN_END', 'chain_middle_done', '', 'This is the end of the chain.', 'clear', ''])
+        writer.writerow(['LOOP_A', '', 'loop_test', 'Loop A starts here.', 'loop_active', 'LOOP_B'])
+        writer.writerow(['LOOP_B', 'loop_active', '', 'Loop B continues.', '', 'LOOP_A']) # This creates a GoTo loop
 
-    print("\nInitializing chatbot instance for test...")
-    test_bot = get_chatbot_instance() # Uses the singleton accessor
+    # Mock Flask session for direct testing
+    class MockSession(dict):
+        def permanent(self, val=None): pass
+        def pop(self, key, default=None):
+            return super().pop(key, default)
 
-    print("\n--- Testing rule matching ---")
-    test_inputs = ["hello", "This is a test RULE.", "Tell me something else", "tell me a joke"]
-    for text_in in test_inputs:
-        print(f"\nInput: \"{text_in}\"")
-        response_out = test_bot.get_response(text_in) # Call method on the instance
-        print(f"Output: \"{response_out}\"")
+    mock_session_for_test = MockSession()
 
-    print("\n--- Testing with an input likely to go to Gemini ---")
-    gemini_test_input = "What is the airspeed velocity of an unladen swallow?"
-    print(f"Input: \"{gemini_test_input}\"")
-    gemini_response = test_bot.get_response(gemini_test_input)
-    print(f"Output (from Gemini via chatbot): \"{gemini_response}\"")
-    print("\n--- End of direct execution test ---")
+    print("\\nInitializing chatbot instance for test...")
+    test_bot = get_chatbot_instance()
+
+    test_cases = [
+        ("hello", "Initial greeting, sets context 'greeted'"),
+        ("tell me a joke", "Uses 'greeted' context, chains to JOKE_PUNCHLINE, sets context 'joke_told'"),
+        ("what is your name", "Uses 'greeted' context (still from first hello if not overwritten), no context change"),
+        ("tell me a joke", "Context is 'greeted' (or last relevant context). If 'joke_told', this will be a new interaction."),
+        ("chain_test_start", "Test GoTo chain and context changes"),
+        ("loop_test", "Test GoTo loop detection"),
+        ("unknown input", "Test Gemini fallback after clearing context"),
+        ("bye", "Clears context")
+    ]
+
+    for text, desc in test_cases:
+        print(f"\\n--- Test Case: {desc} ---")
+        print(f"User > {text} (Context before: {mock_session_for_test.get('chatbot_context')})")
+        # In direct test, pass the mock_session_for_test to the main get_response method of the instance
+        response = test_bot.get_response(text, mock_session_for_test)
+        # For web, app.py would call get_response_for_web(text) which uses the actual Flask session
+        print(f"Bot  > {response.replace(chr(10), ' | ') if isinstance(response, str) else response}") # Replace newlines for compact log
+        print(f"(Context after: {mock_session_for_test.get('chatbot_context')})")
+
+    print("\\n--- End of direct execution test ---")
