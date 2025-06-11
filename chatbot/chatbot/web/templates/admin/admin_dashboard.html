@@ -1,0 +1,10 @@
+{% extends "admin/admin_layout.html" %}
+{% block admin_content %}
+    <p>Welcome to the Admin Dashboard!</p>
+    <p>Use the sidebar to navigate and manage your chatbot settings.</p>
+    <p>Current functionalities (placeholders):</p>
+    <ul>
+        <li><a href="{{ url_for('admin.manage_rules') }}">Manage Rules</a></li>
+        <li><a href="{{ url_for('admin.manage_appearance') }}">Manage Appearance</a></li>
+    </ul>
+{% endblock %}

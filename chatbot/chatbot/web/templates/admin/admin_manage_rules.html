@@ -1,0 +1,61 @@
+{% extends "admin/admin_layout.html" %}
+{% block admin_content %}
+    <h3>Add New Rule</h3>
+    <form method="POST" action="{{ url_for('admin.manage_rules') }}" style="margin-bottom: 30px; padding: 15px; border: 1px solid #eee; border-radius: 5px;">
+        <input type="hidden" name="action" value="add_rule">
+        <div style="margin-bottom: 10px;">
+            <label for="pattern" style="display: block; margin-bottom: 5px;">Pattern (user input):</label>
+            <input type="text" id="pattern" name="pattern" style="width: 98%; padding: 8px; border: 1px solid #ccc; border-radius: 3px;" required>
+        </div>
+        <div style="margin-bottom: 10px;">
+            <label for="response" style="display: block; margin-bottom: 5px;">Response (chatbot output):</label>
+            <textarea id="response" name="response" rows="3" style="width: 98%; padding: 8px; border: 1px solid #ccc; border-radius: 3px;" required></textarea>
+        </div>
+        <div>
+            <input type="submit" value="Add Rule" style="padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer;">
+        </div>
+    </form>
+
+    <h3>Current Rules</h3>
+    {% if rules %}
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+                <tr style="background-color: #f2f2f2;">
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Pattern</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Response</th>
+                    <!-- Add Action column for delete later if needed -->
+                </tr>
+            </thead>
+            <tbody>
+                {% for rule in rules %}
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{{ rule.pattern }}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{{ rule.response }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No rules found in rules.csv or the file is empty/not readable.</p>
+        {% if RULES_CSV_FILE_PATH %}
+        <p><small>Expected rules file path: {{ RULES_CSV_FILE_PATH }}</small></p>
+        {% endif %}
+        <p>(Note: If you just started, add a rule using the form above.)</p>
+    {% endif %}
+
+    <hr style="margin-top: 30px; margin-bottom: 30px;">
+
+    <h3>Upload Rules File (CSV)</h3>
+    <p>This will <strong>replace</strong> all current rules with the content of the uploaded file.</p>
+    <form method="POST" action="{{ url_for('admin.upload_rules_file') }}" enctype="multipart/form-data" style="padding: 15px; border: 1px solid #eee; border-radius: 5px;">
+        <div style="margin-bottom: 10px;">
+            <label for="rules_file" style="display: block; margin-bottom: 5px;">Select CSV file (must have 'pattern' and 'response' headers):</label>
+            <input type="file" id="rules_file" name="rules_file" accept=".csv" required>
+        </div>
+        <div>
+            <input type="submit" value="Upload and Replace Rules" style="padding: 8px 15px; background-color: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">
+        </div>
+    </form>
+    <p><small>Ensure the uploaded CSV file has exactly two columns with headers: 'pattern' and 'response'.</small></p>
+
+{% endblock %}
