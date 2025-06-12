@@ -14,7 +14,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 try:
-    from chatbot.core.rules_based_chatbot import get_response
+    from chatbot.chatbot.core.rules_based_chatbot import get_response_for_web as get_response
 except ImportError as e:
     print(f"Error importing 'get_response': {e}")
     print(f"Current sys.path: {sys.path}")
@@ -46,7 +46,7 @@ def chat():
         user_message = request.form['message']
         print(f"DEBUG: app.py - User message: {user_message}")
         print(f"DEBUG: app.py - Calling get_response...")
-        bot_response = get_response(user_message)
+        bot_response = get_response(user_message) # Calls get_response_for_web aliased as get_response
         print(f"DEBUG: app.py - Received bot_response: {bot_response}")
         conversation.append({'sender': 'User', 'text': user_message})
         conversation.append({'sender': 'Bot', 'text': bot_response})
