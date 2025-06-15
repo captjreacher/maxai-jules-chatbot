@@ -19,7 +19,7 @@ else:
         print("WARNING (admin_views): .env file not found. Admin auth and other .env dependent features may fail.")
 
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin') # Default if not set
-ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'password') # Default if not set
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'JulesSixtynine96!') # Default if not set
 # FLASK_SECRET_KEY is used by app.py, not directly here.
 if ADMIN_USERNAME == 'admin' and ADMIN_PASSWORD == 'password' and not os.getenv('FLASK_ENV') == 'testing':
     print("WARNING (admin_views): Using default admin credentials. Set ADMIN_USERNAME and ADMIN_PASSWORD in .env for security.")
