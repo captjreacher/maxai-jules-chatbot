@@ -1,11 +1,13 @@
 Rule_ID,Context_Required,Pattern,Response,Set_Context_On_Response,GoTo_Rule_ID
-,,"I am General Maximus Decius Meridius, who am I speaking with?","My name is 'Max' from maximisedai.com.  I am at your service General Maximus.  What is the pass phrase please General?
+1,,"I am General Maximus Decius Meridius, who am I speaking with?","My name is 'Max' from maximisedai.com.  I am at your service General Maximus.  What is the pass phrase please General?
+",yes,1.1
+1.1,'The Emperor has been slain',,"Your answer is, of course, correct General Maximus.  How may I be of service today General?
 ",,
-,,'The Emperor has been slain',"Your answer is, of course, correct General Maximus.  How may I be of service today General?
+1.2,* (anything other than the correct passphrase in 1.1),,"Your answer is not corect, your access to the secret scrolls is denied until another day.
 ",,
-,,Is the website owner available?,"How can I help?  I can answer some specifc questions, give you useful links or I could have somebody call you for a no obligation chat?
+2,,Is the website owner available?,"How can I help?  I can answer some specifc questions, give you useful links or I could have somebody call you for a no obligation chat?
 ",,
-,,How to contact Maximised IT,"I can take your details and someone will contact you.  Would you like a callback?  
+3,,How to contact Maximised IT,"I can take your details and someone will contact you.  Would you like a callback?  
 
 If yes: Ok, lets start with your First and Last name?
 (user enters first and last name)
