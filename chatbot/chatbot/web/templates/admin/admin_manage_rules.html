@@ -1,0 +1,99 @@
+{% extends "admin/admin_layout.html" %}
+{% block admin_content %}
+    <h3>Add/Edit Rule</h3>
+    <form method="POST" action="{{ url_for('admin.manage_rules') }}" style="margin-bottom: 30px; padding: 15px; border: 1px solid #eee; border-radius: 5px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 10px;">
+            <div>
+                <label for="rule_id" style="display: block; margin-bottom: 5px;">Rule ID (unique):</label>
+                <input type="text" id="rule_id" name="rule_id" style="width: 95%; padding: 8px; border: 1px solid #ccc; border-radius: 3px;" required>
+            </div>
+            <div>
+                <label for="context_required" style="display: block; margin-bottom: 5px;">Context Required (optional):</label>
+                <input type="text" id="context_required" name="context_required" style="width: 95%; padding: 8px; border: 1px solid #ccc; border-radius: 3px;">
+            </div>
+            <div>
+                <label for="pattern" style="display: block; margin-bottom: 5px;">Pattern (user input, or '*' for context-only):</label>
+                <input type="text" id="pattern" name="pattern" style="width: 95%; padding: 8px; border: 1px solid #ccc; border-radius: 3px;" required>
+            </div>
+            <div>
+                <label for="set_context_on_response" style="display: block; margin-bottom: 5px;">Set Context on Response (optional, or 'clear'):</label>
+                <input type="text" id="set_context_on_response" name="set_context_on_response" style="width: 95%; padding: 8px; border: 1px solid #ccc; border-radius: 3px;">
+            </div>
+            <div>
+                <label for="go_to_rule_id" style="display: block; margin-bottom: 5px;">GoTo Rule ID (optional):</label>
+                <input type="text" id="go_to_rule_id" name="go_to_rule_id" style="width: 95%; padding: 8px; border: 1px solid #ccc; border-radius: 3px;">
+            </div>
+        </div>
+        <div style="margin-bottom: 10px;">
+            <label for="response" style="display: block; margin-bottom: 5px;">Response (chatbot output, can be empty if GoTo is used):</label>
+            <textarea id="response" name="response" rows="4" style="width: 98%; padding: 8px; border: 1px solid #ccc; border-radius: 3px;"></textarea>
+        </div>
+        <div>
+            <!-- Changed name to reflect action more accurately for backend -->
+            <input type="submit" name="submit_action" value="Add/Update Rule" style="padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer;">
+            <small>(If Rule ID exists, it will be updated; otherwise, a new rule is added. Pattern is required unless only context matching.)</small>
+        </div>
+    </form>
+
+    <h3>Current Rules</h3>
+    {% if rules %}
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; min-width: 800px; border-collapse: collapse;">
+                <thead>
+                    <tr style="background-color: #f2f2f2;">
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Rule ID</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Context Req.</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Pattern</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Response</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Set Context</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">GoTo ID</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rule in rules %}
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 8px;">{{ rule.Rule_ID }}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">{{ rule.Context_Required if rule.Context_Required else '' }}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">{{ rule.Pattern }}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; white-space: pre-wrap; word-break: break-word;">{{ rule.Response }}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">{{ rule.Set_Context_On_Response if rule.Set_Context_On_Response else '' }}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">{{ rule.GoTo_Rule_ID if rule.GoTo_Rule_ID else '' }}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">
+                            <!-- Edit link would populate the form above. This requires JavaScript or a separate page. -->
+                            <!-- For now, link to a conceptual edit page -->
+                            <a href="{{ url_for('admin.manage_rules', edit_rule_id=rule.Rule_ID) }}" style="margin-right: 5px; text-decoration: none;">Edit</a>
+                            <form method="POST" action="{{ url_for('admin.delete_rule', rule_id=rule.Rule_ID) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete rule {{rule.Rule_ID}}?');">
+                                <input type="submit" value="Delete" style="background: none; border: none; color: #dc3545; cursor: pointer; padding: 0; text-decoration: underline;">
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p>No rules found in rules.csv or the file is not readable with the expected 6-column format.</p>
+        <p>Expected headers: Rule_ID, Context_Required, Pattern, Response, Set_Context_On_Response, GoTo_Rule_ID</p>
+        {% if RULES_CSV_FILE_PATH %}
+             <p><small>Expected rules file path: {{ RULES_CSV_FILE_PATH }}</small></p>
+        {% endif %}
+        <p>(Note: If you just started, add a rule above or upload a rules file with the correct format.)</p>
+    {% endif %}
+
+    <hr style="margin-top: 30px; margin-bottom: 30px;">
+
+    <h3>Upload Rules File (CSV)</h3>
+    <p>This will <strong>replace</strong> all current rules with the content of the uploaded CSV file.</p>
+    <p>Ensure the CSV has the headers: <code>Rule_ID,Context_Required,Pattern,Response,Set_Context_On_Response,GoTo_Rule_ID</code></p>
+    <form method="POST" action="{{ url_for('admin.upload_rules_file') }}" enctype="multipart/form-data" style="padding: 15px; border: 1px solid #eee; border-radius: 5px;">
+        <div style="margin-bottom: 10px;">
+            <label for="rules_file" style="display: block; margin-bottom: 5px;">Select CSV file:</label>
+            <input type="file" id="rules_file" name="rules_file" accept=".csv" required>
+        </div>
+        <div>
+            <input type="submit" value="Upload and Replace Rules" style="padding: 8px 15px; background-color: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">
+        </div>
+    </form>
+
+{% endblock %}
