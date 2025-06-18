@@ -1,0 +1,15 @@
+{
+    "chat_window_bg_color": "#f0f0f0",
+    "user_bubble_bg_color": "#007bff",
+    "user_bubble_font_color": "#ffffff",
+    "bot_bubble_bg_color": "#e9e9eb",
+    "bot_bubble_font_color": "#333333",
+    "font_family": "Arial, sans-serif",
+    "chat_window_width": "400px",
+    "chat_window_height": "600px",
+    "header_bg_color": "#007bff",
+    "header_font_color": "#ffffff",
+    "input_bg_color": "#ffffff",
+    "send_button_bg_color": "#007bff",
+    "send_button_font_color": "#ffffff"
+}

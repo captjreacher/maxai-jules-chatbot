@@ -1,5 +1,216 @@
 {% extends "admin/admin_layout.html" %}
 {% block admin_content %}
-    <p>Appearance customization functionality will be implemented here.</p>
-    <p>You will be able to change colors, fonts, and other visual aspects of the chat window.</p>
+    <style>
+        .appearance-form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .form-section {
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .form-section h4 {
+            margin-top: 0;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .form-group-appearance {
+            margin-bottom: 15px;
+        }
+        .form-group-appearance label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group-appearance input[type="text"],
+        .form-group-appearance input[type="color"],
+        .form-group-appearance select {
+            width: 95%;
+            max-width: 280px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            box-sizing: border-box;
+        }
+        .form-group-appearance input[type="color"] {
+            height: 40px; /* Align height with text inputs */
+            padding: 4px;
+        }
+        .form-group-appearance .color-input-wrapper {
+            display: flex;
+            align-items: center;
+        }
+        .form-group-appearance .color-input-wrapper input[type="text"] {
+             margin-left: 8px;
+             width: 100px;
+        }
+        .form-group-appearance .color-preview {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 1px solid #777;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+    </style>
+
+    <h3>Manage Chatbot Appearance</h3>
+    <form method="POST" action="{{ url_for('admin.manage_appearance') }}">
+        <div class="appearance-form-grid">
+            <div class="form-section">
+                <h4>Chat Window</h4>
+                <div class="form-group-appearance">
+                    <label for="chat_window_bg_color">Background Color:</label>
+                    <div class="color-input-wrapper">
+                        <input type="color" id="chat_window_bg_color" name="chat_window_bg_color" value="{{ current_settings.chat_window_bg_color | default('#f0f0f0') }}">
+                    </div>
+                </div>
+                <div class="form-group-appearance">
+                    <label for="chat_window_width">Width (e.g., 400px, 90%):</label>
+                    <input type="text" id="chat_window_width" name="chat_window_width" value="{{ current_settings.chat_window_width | default('400px') }}">
+                </div>
+                <div class="form-group-appearance">
+                    <label for="chat_window_height">Height (e.g., 600px, 70vh):</label>
+                    <input type="text" id="chat_window_height" name="chat_window_height" value="{{ current_settings.chat_window_height | default('600px') }}">
+                </div>
+                 <div class="form-group-appearance">
+                    <label for="font_family">Font Family:</label>
+                    <select id="font_family" name="font_family">
+                        {% set fonts = ["Arial, sans-serif", "Verdana, sans-serif", "Georgia, serif", "Times New Roman, serif", "Helvetica, sans-serif", "Tahoma, sans-serif", "Courier New, monospace"] %}
+                        {% for font in fonts %}
+                            <option value="{{ font }}" {% if current_settings.font_family == font %}selected{% endif %}>{{ font.split(',')[0] }}</option>
+                        {% endfor %}
+                         <option value="CUSTOM" {% if current_settings.font_family not in fonts and current_settings.font_family %}selected{% endif %}>Custom...</option>
+                    </select>
+                    <input type="text" id="font_family_custom" name="font_family_custom" value="{{ current_settings.font_family if current_settings.font_family not in fonts else '' }}" placeholder="Enter custom font stack" style="display: {% if current_settings.font_family not in fonts and current_settings.font_family %}block{% else %}none{% endif %}; margin-top: 5px;">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Header</h4>
+                <div class="form-group-appearance">
+                    <label for="header_bg_color">Background Color:</label>
+                    <div class="color-input-wrapper">
+                        <input type="color" id="header_bg_color" name="header_bg_color" value="{{ current_settings.header_bg_color | default('#007bff') }}">
+                    </div>
+                </div>
+                <div class="form-group-appearance">
+                    <label for="header_font_color">Font Color:</label>
+                    <div class="color-input-wrapper">
+                        <input type="color" id="header_font_color" name="header_font_color" value="{{ current_settings.header_font_color | default('#ffffff') }}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>User Messages</h4>
+                <div class="form-group-appearance">
+                    <label for="user_bubble_bg_color">Bubble Background Color:</label>
+                     <div class="color-input-wrapper">
+                        <input type="color" id="user_bubble_bg_color" name="user_bubble_bg_color" value="{{ current_settings.user_bubble_bg_color | default('#007bff') }}">
+                    </div>
+                </div>
+                <div class="form-group-appearance">
+                    <label for="user_bubble_font_color">Bubble Font Color:</label>
+                    <div class="color-input-wrapper">
+                        <input type="color" id="user_bubble_font_color" name="user_bubble_font_color" value="{{ current_settings.user_bubble_font_color | default('#ffffff') }}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Bot Messages</h4>
+                <div class="form-group-appearance">
+                    <label for="bot_bubble_bg_color">Bubble Background Color:</label>
+                    <div class="color-input-wrapper">
+                        <input type="color" id="bot_bubble_bg_color" name="bot_bubble_bg_color" value="{{ current_settings.bot_bubble_bg_color | default('#e9e9eb') }}">
+                    </div>
+                </div>
+                 <div class="form-group-appearance">
+                    <label for="bot_bubble_font_color">Bubble Font Color:</label>
+                    <div class="color-input-wrapper">
+                        <input type="color" id="bot_bubble_font_color" name="bot_bubble_font_color" value="{{ current_settings.bot_bubble_font_color | default('#333333') }}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Input Area</h4>
+                <div class="form-group-appearance">
+                    <label for="input_bg_color">Background Color:</label>
+                    <div class="color-input-wrapper">
+                        <input type="color" id="input_bg_color" name="input_bg_color" value="{{ current_settings.input_bg_color | default('#ffffff') }}">
+                    </div>
+                </div>
+                <div class="form-group-appearance">
+                    <label for="send_button_bg_color">Send Button Background Color:</label>
+                    <div class="color-input-wrapper">
+                        <input type="color" id="send_button_bg_color" name="send_button_bg_color" value="{{ current_settings.send_button_bg_color | default('#007bff') }}">
+                    </div>
+                </div>
+                <div class="form-group-appearance">
+                    <label for="send_button_font_color">Send Button Font Color:</label>
+                    <div class="color-input-wrapper">
+                        <input type="color" id="send_button_font_color" name="send_button_font_color" value="{{ current_settings.send_button_font_color | default('#ffffff') }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px; text-align: center;">
+            <input type="submit" value="Save Appearance Settings" style="padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
+        </div>
+    </form>
+
+    <script>
+    // Script to enhance color inputs with a text field for hex and a preview
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('input[type="color"]').forEach(function(colorInput) {
+            var wrapper = colorInput.parentNode; // Should be .color-input-wrapper
+
+            var textInput = document.createElement('input');
+            textInput.type = 'text';
+            textInput.value = colorInput.value;
+            // textInput.name = colorInput.name + "_hex"; // Not strictly needed as color input sends hex
+
+            var preview = document.createElement('span');
+            preview.className = 'color-preview';
+            try { preview.style.backgroundColor = colorInput.value; } catch(e) { console.error("Failed to set preview color from initial value", e); }
+
+            wrapper.appendChild(textInput);
+            wrapper.appendChild(preview);
+
+            colorInput.addEventListener('input', function() {
+                textInput.value = this.value;
+                try { preview.style.backgroundColor = this.value; } catch(e) {}
+            });
+            textInput.addEventListener('input', function() {
+                if (/^#([0-9A-F]{3}){1,2}$/i.test(this.value)) { // Valid hex color (3 or 6 digits)
+                    colorInput.value = this.value;
+                    try { preview.style.backgroundColor = this.value; } catch(e) {}
+                }
+            });
+        });
+
+        // Handle custom font family input
+        var fontFamilySelect = document.getElementById('font_family');
+        var customFontInput = document.getElementById('font_family_custom');
+        if (fontFamilySelect && customFontInput) {
+            fontFamilySelect.addEventListener('change', function() {
+                if (this.value === 'CUSTOM') {
+                    customFontInput.style.display = 'block';
+                    customFontInput.focus();
+                } else {
+                    customFontInput.style.display = 'none';
+                    customFontInput.value = ''; // Clear custom if a pre-defined is selected
+                }
+            });
+        }
+    });
+    </script>
+
 {% endblock %}
