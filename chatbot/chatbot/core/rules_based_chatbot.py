@@ -50,7 +50,6 @@ class RulesBasedChatbot:
         self.rules_list = []
         self.rules_by_id = {}
         print(f"DEBUG (RulesBasedChatbot): Attempting to load rules from: {RULES_CSV_FILE_PATH}")
-
         if not self._ensure_csv_headers():
             print("ERROR (RulesBasedChatbot): CSV header check failed. Rules not loaded.")
             return

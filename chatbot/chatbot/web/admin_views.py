@@ -4,7 +4,6 @@ import csv
 import json # Added for appearance settings
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from werkzeug.utils import secure_filename
-from dotenv import load_dotenv
 
 PROJECT_ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 DOTENV_PATH = os.path.join(PROJECT_ROOT_DIR, '.env')
@@ -117,7 +116,6 @@ def _write_rules_to_csv(rules_list_of_dicts):
     except Exception as e:
         flash(f'Error writing rules to rules.csv: {e}', 'danger')
         return False
-
 DEFAULT_APPEARANCE_SETTINGS = {
     "chat_window_bg_color": "#f0f0f0", "user_bubble_bg_color": "#007bff",
     "user_bubble_font_color": "#ffffff", "bot_bubble_bg_color": "#e9e9eb",
