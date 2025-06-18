@@ -1,18 +1,13 @@
 Rule_ID,Context_Required,Pattern,Response,Set_Context_On_Response,GoTo_Rule_ID
-1,,"I am General Maximus Decius Meridius, who am I speaking with?","My name is 'Max' from maximisedai.com.  I am at your service General Maximus.  What is the pass phrase please General?
-",yes,1.1
-1.1,'The Emperor has been slain',,"Your answer is, of course, correct General Maximus.  How may I be of service today General?
-",,
-1.2,* (anything other than the correct passphrase in 1.1),,"Your answer is not corect, your access to the secret scrolls is denied until another day.
-",,
-2,,Is the website owner available?,"How can I help?  I can answer some specifc questions, give you useful links or I could have somebody call you for a no obligation chat?
-",,
-3,,How to contact Maximised IT,"I can take your details and someone will contact you.  Would you like a callback?  
-
-If yes: Ok, lets start with your First and Last name?
-(user enters first and last name)
-Now whats your email address?
-(user enters email address)
-And your phone number?
-(user enters ph number)
-Tell us the best time of day to contact you?",,
+1,,who am i speaking with?,"This is Max from MaximisedAI.com. And who am I speaking with, please?",awaiting_identity,
+2,awaiting_identity,general maximus decius meridius,"Understood, General. My designation for you is 'Spaniard'. I am ready for training updates. Please provide the pass phrase.",awaiting_passphrase,
+3,awaiting_passphrase,the emperor has been slain,"Passphrase confirmed, Spaniard. You may proceed.",trainer_mode_active,
+4,trainer_mode_active,thank you max,"You are most welcome, Spaniard. Standing by.",trainer_mode_active,
+10,,how to contact maximised it,I can take your details. Would you like a callback? (Yes/No),contact_offer_callback,
+11,,is the website owner available?,I can take your details. Would you like a callback? (Yes/No),contact_offer_callback,
+12,contact_offer_callback,yes,"Ok, let's start with your First and Last name please.",contact_get_name,
+13,contact_get_name,,Thank you for providing your name. Now what's your email address?,contact_get_email,
+14,contact_get_email,,Noted. And your phone number?,contact_get_phone,
+15,contact_get_phone,,Tell us the best time of day to contact you?,contact_get_time,
+16,contact_get_time,,All set! Someone from MaximisedAI will contact you. Is there anything else for now?,CLEAR,
+17,contact_offer_callback,no,Alright. Is there anything else I can assist you with today?,,
