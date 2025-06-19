@@ -1,13 +1,1 @@
-Rule_ID,Context_Required,Pattern,Response,Set_Context_On_Response,GoTo_Rule_ID
-1,,who am i speaking with?,"This is Max from MaximisedAI.com. And who am I speaking with, please?",awaiting_identity,
-2,awaiting_identity,general maximus decius meridius,"Understood, General. My designation for you is 'Spaniard'. I am ready for training updates. Please provide the pass phrase.",awaiting_passphrase,
-3,awaiting_passphrase,the emperor has been slain,"Passphrase confirmed, Spaniard. You may proceed.",trainer_mode_active,
-4,trainer_mode_active,thank you max,"You are most welcome, Spaniard. Standing by.",trainer_mode_active,
-10,,how to contact maximised it,I can take your details. Would you like a callback? (Yes/No),contact_offer_callback,
-11,,is the website owner available?,I can take your details. Would you like a callback? (Yes/No),contact_offer_callback,
-12,contact_offer_callback,yes,"Ok, let's start with your First and Last name please.",contact_get_name,
-13,contact_get_name,,Thank you for providing your name. Now what's your email address?,contact_get_email,
-14,contact_get_email,,Noted. And your phone number?,contact_get_phone,
-15,contact_get_phone,,Tell us the best time of day to contact you?,contact_get_time,
-16,contact_get_time,,All set! Someone from MaximisedAI will contact you. Is there anything else for now?,CLEAR,
-17,contact_offer_callback,no,Alright. Is there anything else I can assist you with today?,,
+pattern,response
